@@ -1,0 +1,1501 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UAV Benchmark Simulator</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.143/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.143/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<style>
+:root {
+  --p: rgba(10,15,22,.92);
+  --b: #ffffff18;
+  --a: #4fd1c5;
+  --d: #8b98a8;
+  --blue: #60a5fa;
+}
+* { box-sizing: border-box; }
+html, body, #cesiumContainer {
+  width: 100%; height: 100%; margin: 0; overflow: hidden;
+  background: #05070a; font: 12px "Segoe UI", Arial; color: #eef2f6;
+}
+button {
+  width: 100%; margin-top: 7px; padding: 9px;
+  border: 1px solid var(--b); border-radius: 8px;
+  background: #ffffff08; color: inherit; cursor: pointer;
+  transition: background .15s ease;
+}
+button:hover { background: #ffffff12; }
+button:disabled { opacity: .35; cursor: not-allowed; }
+.hidden { display: none !important; }
+#ui {
+  position: absolute; z-index: 100; top: 18px; left: 18px; width: 340px;
+  background: var(--p); backdrop-filter: blur(12px);
+  border: 1px solid var(--b); border-radius: 14px;
+  box-shadow: 0 12px 40px #0008; overflow: hidden;
+}
+.head, .blk { padding: 12px 16px; border-bottom: 1px solid var(--b); }
+.head { display: flex; gap: 10px; align-items: center; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--a); box-shadow: 0 0 8px var(--a); }
+#status { margin-left: auto; color: var(--d); font-size: 10px; }
+.title { font-weight: 600; }
+.cap { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--d); margin-bottom: 8px; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.active { color: var(--a); background: #4fd1c51c; border-color: #4fd1c580; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-family: Consolas, monospace; }
+.item { display: flex; justify-content: space-between; }
+.dim { color: var(--d); }
+.val { color: var(--a); font-weight: 600; }
+.row { display: flex; justify-content: space-between; margin: 6px 0; }
+#recordIndicator { display: none; color: #ef4444; font-weight: 700; }
+#recordIndicator.on { display: block; }
+#recordBtn.recording { background: #ef4444; color: white; }
+.blue { color: #bfdbfe; background: #60a5fa20; border-color: #60a5fa66; }
+.info, .progressText { font: 10px Consolas, monospace; color: var(--d); margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.progress { height: 6px; background: #ffffff0d; border-radius: 6px; overflow: hidden; margin-top: 10px; }
+.bar { height: 100%; width: 0; background: var(--blue); }
+.controls { color: var(--d); line-height: 1.8; }
+kbd { padding: 1px 5px; border: 1px solid var(--b); border-radius: 4px; color: #eef2f6; background: #ffffff0c; font: 10px Consolas; }
+.note { margin-top: 8px; padding: 7px 9px; background: #60a5fa12; border-radius: 6px; color: var(--d); font-size: 10px; line-height: 1.4; }
+#startOverlay {
+  position: absolute; z-index: 200; top: 24px; left: 50%; transform: translateX(-50%);
+  min-width: 360px; padding: 17px 23px; text-align: center;
+  background: var(--p); border: 1px solid var(--b); border-radius: 14px; box-shadow: 0 12px 40px #0008;
+}
+#startOverlay b { color: var(--a); }
+#confirmStartBtn { display: none; width: auto; margin: 11px auto 0; background: var(--a); color: #06201d; font-weight: 700; }
+#startAltitudeWrap { display:none; margin-top:12px; text-align:left; }
+#startAltitudeWrap label { display:block; margin-bottom:5px; color:var(--d); font-size:10px; text-transform:uppercase; letter-spacing:.8px; }
+#startAltitude { width:100%; padding:9px 10px; border:1px solid var(--b); border-radius:8px; background:#ffffff08; color:#eef2f6; outline:none; }
+#startAltitude:focus { border-color:#4fd1c580; }
+#startSpeedWrap { display:none; margin-top:12px; text-align:left; }
+#startSpeedWrap label { display:block; margin-bottom:5px; color:var(--d); font-size:10px; text-transform:uppercase; letter-spacing:.8px; }
+#startSpeed { width:100%; padding:9px 10px; border:1px solid var(--b); border-radius:8px; background:#ffffff08; color:#eef2f6; outline:none; }
+#startSpeed:focus { border-color:#4fd1c580; }
+#renderModeSelect, #tileWaitMs { width:100%; padding:8px 9px; border:1px solid var(--b); border-radius:8px; background:#111820; color:#eef2f6; outline:none; }
+#renderModeSelect:focus, #tileWaitMs:focus { border-color:#60a5fa88; }
+.renderSetting { margin-top:10px; }
+.renderSetting label { display:block; margin-bottom:5px; color:var(--d); font-size:10px; text-transform:uppercase; letter-spacing:.8px; }
+.advancedToggle { margin-top:10px; }
+.advancedPanel { margin-top:8px; padding:10px; border:1px solid var(--b); border-radius:8px; background:#ffffff05; }
+.advancedGrid { display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; }
+.advancedGrid label { display:block; color:var(--d); font-size:10px; margin-bottom:4px; }
+.advancedGrid input { width:100%; padding:7px 8px; border:1px solid var(--b); border-radius:7px; background:#111820; color:#eef2f6; outline:none; }
+.advancedGrid input:focus { border-color:#60a5fa88; }
+.profilerBox {
+  margin-top:10px;
+  padding:10px;
+  border:1px solid var(--b);
+  border-radius:8px;
+  background:#ffffff05;
+}
+.profilerBox label {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--d);
+  font-size:10px;
+}
+.profilerBox input[type="checkbox"] {
+  width:auto;
+  margin:0;
+}
+.profilerMono {
+  margin-top:8px;
+  white-space:pre-wrap;
+  font:10px Consolas, monospace;
+  color:var(--d);
+  line-height:1.45;
+}
+#crosshair { display: none; position: absolute; z-index: 50; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px; pointer-events: none; }
+#crosshair:before, #crosshair:after { content: ""; position: absolute; background: #4fd1c5e6; }
+#crosshair:before { top: 8px; width: 18px; height: 2px; }
+#crosshair:after { left: 8px; width: 2px; height: 18px; }
+</style>
+</head>
+<body>
+
+<div id="cesiumContainer"></div>
+<div id="crosshair"></div>
+
+<!-- BAŞLANGIÇ KONUMU SEÇİMİ -->
+<div id="startOverlay">
+  <div id="startText">Uçuşa başlamak için haritada <b>bir noktaya tıklayın</b>.</div>
+  <div id="startHint" class="dim" style="margin-top:9px;font-size:10px">Uçuş kaydı için daha sonra output klasörü seçebilirsiniz.</div>
+  <div id="startAltitudeWrap">
+    <label for="startAltitude">Başlangıç İrtifası (m)</label>
+    <input id="startAltitude" type="number" min="5" max="20000" step="1" value="500">
+    <div class="dim" style="margin-top:5px;font-size:10px">İzin verilen aralık: 5–20.000 m</div>
+  </div>
+  <div id="startSpeedWrap">
+    <label for="startSpeed">Maksimum Normal Hız (m/s)</label>
+    <input id="startSpeed" type="number" min="5" max="300" step="1" value="70">
+    <div class="dim" style="margin-top:5px;font-size:10px">İzin verilen aralık: 5–300 m/s · Shift ile geçici üst limit 2× olur</div>
+  </div>
+  <button id="confirmStartBtn" type="button">▶ Buradan Başla</button>
+</div>
+
+<!-- ANA PANEL -->
+<div id="ui" class="hidden">
+  <div class="head">
+    <span class="dot"></span>
+    <span class="title">UAV Benchmark</span>
+    <span id="status">Ready</span>
+  </div>
+
+  <div class="blk">
+    <div class="cap">Mode</div>
+    <div class="modes">
+      <button id="flightModeBtn" class="active" type="button">✈ Flight</button>
+      <button id="renderModeBtn" type="button">🎞 Render</button>
+    </div>
+  </div>
+
+  <!-- UÇUŞ PANELİ -->
+  <div id="flightPanel">
+    <div class="blk">
+      <div class="cap">Telemetry</div>
+      <div class="grid">
+        <div class="item"><span class="dim">Lat</span><span id="lat" class="val">-</span></div>
+        <div class="item"><span class="dim">Lon</span><span id="lon" class="val">-</span></div>
+        <div class="item"><span class="dim">Alt</span><span id="alt" class="val">-</span></div>
+        <div class="item"><span class="dim">Speed</span><span id="speed" class="val">0</span></div>
+        <div class="item"><span class="dim">Max Speed</span><span id="maxSpeed" class="val">70</span></div>
+        <div class="item"><span class="dim">FOV</span><span id="fov" class="val">70</span></div>
+        <div class="item"><span class="dim">Pitch</span><span id="pitch" class="val">-</span></div>
+        <div class="item"><span class="dim">Roll</span><span id="roll" class="val">-</span></div>
+        <div class="item"><span class="dim">Yaw</span><span id="yaw" class="val">-</span></div>
+      </div>
+    </div>
+
+    <div class="blk">
+      <div class="cap">Flight Recording</div>
+      <div id="recordIndicator">● RECORDING</div>
+      <div class="row"><span class="dim">Frames</span><span id="frames" class="val">0</span></div>
+      <div class="row"><span class="dim">Time</span><span id="time" class="val">0.00 s</span></div>
+      <button id="folderBtn" type="button">📁 Select Output Folder</button>
+      <button id="recordBtn" type="button">● START RECORDING</button>
+      <button id="saveBtn" type="button" disabled>💾 Save trajectory.csv</button>
+      <button id="changeBtn" type="button">⟲ Change Start Location</button>
+    </div>
+
+    <div class="blk">
+      <div class="cap">Flight Controls</div>
+      <div class="controls">
+        <div><kbd>W</kbd><kbd>S</kbd> Forward / Back</div>
+        <div><kbd>A</kbd><kbd>D</kbd> Strafe</div>
+        <div><kbd>Space</kbd> Altitude +</div>
+        <div><kbd>Ctrl</kbd> Altitude -</div>
+        <div>Mouse → Yaw / Pitch</div>
+        <div><kbd>Q</kbd><kbd>E</kbd> Roll</div>
+        <div><kbd>R</kbd><kbd>F</kbd> FOV</div>
+        <div><kbd>Shift</kbd> Speed ×2</div>
+        <div><kbd>Esc</kbd> Release mouse</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RENDER PANELİ -->
+  <div id="renderPanel" class="hidden">
+    <div class="blk">
+      <div class="cap">Recorded Flight</div>
+      <button id="csvBtn" type="button">📄 Select trajectory.csv</button>
+      <div id="csvInfo" class="info">CSV seçilmedi</div>
+    </div>
+
+    <div class="blk">
+      <div class="cap">Render Output</div>
+
+      <div class="renderSetting">
+        <label for="renderModeSelect">Render Policy</label>
+        <select id="renderModeSelect">
+          <option value="fast">Fast Replay · 15 FPS max</option>
+          <option value="standard">Standard · 30 ms settle</option>
+          <option value="quality3d">3D Quality · wait for tiles</option>
+        </select>
+      </div>
+
+      <div id="tileWaitWrap" class="renderSetting hidden">
+        <label for="tileWaitMs">3D Tile Maximum Wait (ms)</label>
+        <input id="tileWaitMs" type="number" min="300" max="3000" step="100" value="1000">
+        <div class="dim" style="margin-top:5px;font-size:10px">İzin verilen aralık: 300–3000 ms. Tile'lar daha erken hazırsa bekleme erken biter.</div>
+      </div>
+
+      <div id="renderModeInfo" class="note">Fast Replay: 15 FPS üst sınırı, yalnızca ilk 10 keyframe için +30 ms warm-up.</div>
+      <button id="keyframeSettingsBtn" class="advancedToggle" type="button">⚙ Advanced Keyframe Settings</button>
+      <div id="keyframeSettingsPanel" class="advancedPanel hidden">
+        <div class="advancedGrid">
+          <div>
+            <label for="kfPosition">Position threshold (m)</label>
+            <input id="kfPosition" type="number" min="0.1" max="10000" step="0.1" value="10">
+          </div>
+          <div>
+            <label for="kfYaw">Yaw threshold (°)</label>
+            <input id="kfYaw" type="number" min="0.1" max="180" step="0.1" value="5">
+          </div>
+          <div>
+            <label for="kfPitch">Pitch threshold (°)</label>
+            <input id="kfPitch" type="number" min="0.1" max="180" step="0.1" value="5">
+          </div>
+          <div>
+            <label for="kfRoll">Roll threshold (°)</label>
+            <input id="kfRoll" type="number" min="0.1" max="180" step="0.1" value="5">
+          </div>
+          <div>
+            <label for="kfFov">FOV threshold (°)</label>
+            <input id="kfFov" type="number" min="0.1" max="180" step="0.1" value="10">
+          </div>
+          <div>
+            <label for="kfMinInterval">Minimum interval (s)</label>
+            <input id="kfMinInterval" type="number" min="0" max="60" step="0.01" value="0.20">
+          </div>
+        </div>
+        <div class="dim" style="margin-top:8px;font-size:10px;line-height:1.4">
+          Keyframe seçimi OR mantığıyla çalışır: minimum interval geçtikten sonra konum, yaw, pitch, roll veya FOV eşiklerinden herhangi biri aşılırsa frame seçilir.
+        </div>
+      </div>
+
+      <div class="profilerBox">
+        <label>
+          <input id="enableProfiler" type="checkbox" checked>
+          <span>Stage profiler active</span>
+        </label>
+        <div id="profilerInfo" class="profilerMono">Henüz ölçüm yok.</div>
+      </div>
+
+      <button id="renderFolderBtn" type="button">📁 Select Render Output Folder</button>
+      <div id="renderFolderInfo" class="info">Output klasörü seçilmedi</div>
+      <button id="renderBtn" class="blue" type="button" disabled>▶ START RENDER</button>
+      <div class="progress"><div id="progressBar" class="bar"></div></div>
+      <div id="progressText" class="progressText">0 / 0</div>
+      <div class="note">Telemetry tabanlı keyframe seçimi uygulanır. Render modunda viewport kullanıcı girişlerine kapatılır.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkOGVmOTM1ZS0xZDA4LTRmYTItYmMyNS1iY2Q4NmZjNjQ1NGQiLCJpZCI6NDY3NjEzLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODY2MjQxMzB9.plWs4Qixfoc6JwpgMi8abLOwTh_5zs1W18pg0_et8zw";
+
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function stopEvent(e) { e.preventDefault(); e.stopPropagation(); }
+
+// KEYFRAME AYARLARI
+const KEYFRAME_CONFIG = {
+  positionMeters: 10.0,
+  yawDegrees: 5.0,
+  pitchDegrees: 5.0,
+  rollDegrees: 5.0,
+  fovDegrees: 10.0,
+  minIntervalSec: 0.20
+};
+
+let appMode = "flight"; // flight | render
+
+const viewer = new Cesium.Viewer("cesiumContainer", {
+  animation: false,
+  timeline: false,
+  navigationHelpButton: false,
+  homeButton: false,
+  sceneModePicker: false,
+  baseLayerPicker: false,
+  geocoder: false,
+  scene3DOnly: true,
+  contextOptions: { webgl: { preserveDrawingBuffer: true } }
+});
+viewer.scene.globe.depthTestAgainstTerrain = true;
+
+let googleTileset = null;
+
+Cesium.createGooglePhotorealistic3DTileset()
+  .then(tileset => {
+    googleTileset = tileset;
+    viewer.scene.primitives.add(tileset);
+    $("status").textContent = "Ready";
+  })
+  .catch(err => {
+    $("status").textContent = "3D Tiles error";
+    console.error(err);
+  });
+
+// DİNAMİK FİZİK VE DRONE DURUMU
+const state = {
+  latitude: 51.507275,
+  longitude: -0.073256,
+  altitude: 500,
+  yaw: 43.73,
+  pitch: 45,
+  roll: 0,
+  fov: 70,
+  // Hız ve İvmelenme Parametreleri
+  vx: 0, 
+  vy: 0, 
+  vz: 0, 
+  maxSpeed: 70,    // Normal maksimum hız (m/s)
+  currentMax: 70,  // Anlık dinamik limit (Shift'e basıldığında yumuşakça değişir)
+  accel: 45,       // İvmelenme oranı (m/s^2)
+  damping: 2.8     // Sürtünme / Süzülerek durma katsayısı
+};
+
+let started = false, pending = null, locked = false;
+let recording = false, recStart = 0, nextSample = 0, frame = 0, trajectory = [];
+const FPS = 30, INT = 1 / FPS;
+
+// BAŞLANGIÇ NOKTASI SEÇİMİ
+const picker = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+picker.setInputAction(m => {
+  if (started) return;
+  let c = viewer.scene.pickPositionSupported ? viewer.scene.pickPosition(m.position) : null;
+  if (!Cesium.defined(c)) c = viewer.camera.pickEllipsoid(m.position, viewer.scene.globe.ellipsoid);
+  if (!Cesium.defined(c)) return;
+  
+  const p = Cesium.Cartographic.fromCartesian(c);
+  pending = {
+    latitude: Cesium.Math.toDegrees(p.latitude),
+    longitude: Cesium.Math.toDegrees(p.longitude),
+    groundHeight: p.height || 0
+  };
+  $("startText").innerHTML = "Seçilen konum: <b>" + pending.latitude.toFixed(6) + ", " + pending.longitude.toFixed(6) + "</b><br>Onaylamak için butona basın.";
+  $("startAltitudeWrap").style.display = "block";
+  $("startSpeedWrap").style.display = "block";
+  $("confirmStartBtn").style.display = "block";
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+$("confirmStartBtn").onclick = e => {
+  stopEvent(e);
+  if (!pending) return;
+  const requestedAltitude = Number($("startAltitude").value);
+  if (!Number.isFinite(requestedAltitude) || requestedAltitude < 5 || requestedAltitude > 20000) {
+    alert("Başlangıç irtifası 5 ile 20.000 metre arasında olmalıdır.");
+    return;
+  }
+
+  const requestedMaxSpeed = Number($("startSpeed").value);
+  if (!Number.isFinite(requestedMaxSpeed) || requestedMaxSpeed < 5 || requestedMaxSpeed > 300) {
+    alert("Maksimum normal hız 5 ile 300 m/s arasında olmalıdır.");
+    return;
+  }
+
+  Object.assign(state, {
+    latitude: pending.latitude,
+    longitude: pending.longitude,
+    altitude: requestedAltitude,
+    pitch: 45,
+    roll: 0,
+    vx: 0, vy: 0, vz: 0,
+    maxSpeed: requestedMaxSpeed,
+    currentMax: requestedMaxSpeed
+  });
+  started = true;
+  $("startOverlay").style.display = "none";
+  $("ui").classList.remove("hidden");
+  $("crosshair").style.display = "block";
+};
+
+$("changeBtn").onclick = e => {
+  stopEvent(e);
+  if (recording) stopRecording();
+  if (rendering) return;
+  location.reload();
+};
+
+// KLAVYE VE FARE KONTROLLERİ
+const keys = {};
+window.addEventListener("keydown", e => {
+  if (appMode !== "flight" || rendering) return;
+  keys[e.code] = true;
+  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+});
+window.addEventListener("keyup", e => {
+  if (appMode !== "flight" || rendering) return;
+  keys[e.code] = false;
+});
+
+$("cesiumContainer").onclick = e => {
+  if (appMode !== "flight" || rendering) return;
+  if (started) {
+    e.stopPropagation();
+    $("cesiumContainer").requestPointerLock().catch(() => {});
+  }
+};
+document.onpointerlockchange = () => locked = document.pointerLockElement === $("cesiumContainer");
+document.onmousemove = e => {
+  if (appMode !== "flight" || rendering) return;
+  if (locked) {
+    state.yaw = (state.yaw + e.movementX * 0.12 + 360) % 360;
+    state.pitch = Math.max(-89, Math.min(89, state.pitch - e.movementY * 0.12));
+  }
+};
+
+// İVMELİ VE SÜZÜLMELİ UÇUŞ DİNAMİĞİ
+function fly(dt) {
+  let targetF = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+  let targetR = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+  let targetV = (keys.Space ? 1 : 0) - ((keys.ControlLeft || keys.ControlRight) ? 1 : 0);
+
+  // Olası maksimum hızı hesapla (Shift basılıysa 2 katı)
+  let targetMax = state.maxSpeed * ((keys.ShiftLeft || keys.ShiftRight) ? 2 : 1);
+  
+  // Shift bırakıldığında hız limitinin aniden değil, yumuşak bir şekilde düşmesini sağlar
+  state.currentMax += (targetMax - state.currentMax) * Math.min(1, dt * 2.5);
+
+  // İleri/Geri İvmelenme & Yavaşlama
+  if (targetF !== 0) state.vx += targetF * state.accel * dt;
+  else state.vx += (0 - state.vx) * Math.min(1, state.damping * dt);
+
+  // Sağ/Sol İvmelenme & Yavaşlama
+  if (targetR !== 0) state.vy += targetR * state.accel * dt;
+  else state.vy += (0 - state.vy) * Math.min(1, state.damping * dt);
+
+  // Dikey İvmelenme & Yavaşlama
+  if (targetV !== 0) state.vz += targetV * (state.accel * 0.8) * dt;
+  else state.vz += (0 - state.vz) * Math.min(1, state.damping * dt);
+
+  // Hız Sınırlandırma (Sabit bir değere değil, dinamik olan state.currentMax'a kilitlenir)
+  state.vx = Math.max(-state.currentMax, Math.min(state.currentMax, state.vx));
+  state.vy = Math.max(-state.currentMax, Math.min(state.currentMax, state.vy));
+  state.vz = Math.max(-60, Math.min(60, state.vz));
+
+  // Coğrafi Konum Hesaplama
+  let y = Cesium.Math.toRadians(state.yaw);
+  state.latitude += (Math.cos(y) * state.vx - Math.sin(y) * state.vy) * dt / 111320;
+  state.longitude += (Math.sin(y) * state.vx + Math.cos(y) * state.vy) * dt / (111320 * Math.cos(Cesium.Math.toRadians(state.latitude)));
+
+  // Genişletilmiş İrtifa Sınırı (5m - 20.000m)
+  state.altitude += state.vz * dt;
+  state.altitude = Math.max(5, Math.min(20000, state.altitude));
+
+  // Roll (Yatış) ve FOV Dinamiği
+  if (keys.KeyQ) state.roll += 30 * dt;
+  else if (keys.KeyE) state.roll -= 30 * dt;
+  else {
+    let targetRoll = - (state.vy / state.currentMax) * 15;
+    state.roll += (targetRoll - state.roll) * Math.min(1, dt * 5);
+  }
+  state.roll = Math.max(-30, Math.min(30, state.roll));
+
+  if (keys.KeyR) state.fov += 30 * dt;
+  if (keys.KeyF) state.fov -= 30 * dt;
+  state.fov = Math.max(40, Math.min(100, state.fov));
+
+  // Anlık 3B Bileşke Hız Telemetrisi
+  let speedMagnitude = Math.sqrt(state.vx * state.vx + state.vy * state.vy + state.vz * state.vz);
+  $("speed").textContent = speedMagnitude.toFixed(1);
+}
+
+function camera(s = state) {
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(s.longitude, s.latitude, s.altitude),
+    orientation: {
+      heading: Cesium.Math.toRadians(s.yaw),
+      pitch: Cesium.Math.toRadians(s.pitch - 90),
+      roll: Cesium.Math.toRadians(s.roll)
+    }
+  });
+  viewer.camera.frustum.fov = Cesium.Math.toRadians(s.fov);
+}
+
+// TELEMETRİ KAYIT DÖNGÜSÜ
+function recFrame(t) {
+  let q = (t - recStart) / 1000;
+  trajectory.push({
+    frame_number: frame,
+    timestamp_sec: +q.toFixed(4),
+    latitude: +state.latitude.toFixed(8),
+    longitude: +state.longitude.toFixed(8),
+    altitude: +state.altitude.toFixed(3),
+    fov: +state.fov.toFixed(3),
+    pitch: +state.pitch.toFixed(3),
+    roll: +state.roll.toFixed(3),
+    yaw: +state.yaw.toFixed(3)
+  });
+  frame++;
+  $("frames").textContent = frame;
+  $("time").textContent = q.toFixed(2) + " s";
+}
+
+function recordLoop(t) {
+  if (!recording) return;
+  let q = (t - recStart) / 1000, n = 0;
+  while (q >= nextSample && n < 10) {
+    recFrame(recStart + nextSample * 1000);
+    nextSample += INT;
+    n++;
+  }
+  if (q - nextSample > 2) nextSample = q;
+}
+
+$("recordBtn").onclick = e => {
+  stopEvent(e);
+  if (!started) return;
+  if (!recording) {
+    trajectory = [];
+    frame = 0;
+    nextSample = 0;
+    recStart = performance.now();
+    recording = true;
+    $("recordBtn").textContent = "■ STOP RECORDING";
+    $("recordBtn").classList.add("recording");
+    $("recordIndicator").classList.add("on");
+    $("saveBtn").disabled = true;
+    $("status").textContent = "Recording...";
+  } else {
+    stopRecording();
+  }
+};
+
+function stopRecording() {
+  recording = false;
+  $("recordBtn").textContent = "● START RECORDING";
+  $("recordBtn").classList.remove("recording");
+  $("recordIndicator").classList.remove("on");
+  $("saveBtn").disabled = !trajectory.length;
+  $("status").textContent = "Recording stopped";
+}
+
+function csv() {
+  return "frame_number,timestamp_sec,latitude,longitude,altitude,fov,pitch,roll,yaw\n" +
+    trajectory.map(r => [r.frame_number, r.timestamp_sec, r.latitude, r.longitude, r.altitude, r.fov, r.pitch, r.roll, r.yaw].join(",")).join("\n") + "\n";
+}
+
+// KLASÖR VE CSV KAYDETME
+let outputDir = null;
+const fs = typeof showDirectoryPicker === "function";
+
+$("folderBtn").onclick = async e => {
+  stopEvent(e);
+  if (!fs) { alert("Chrome/Edge kullanın ve dosyayı bir web sunucusu üzerinden açın."); return; }
+  try {
+    outputDir = await showDirectoryPicker({ mode: "readwrite" });
+    $("folderBtn").textContent = "📁 " + outputDir.name;
+    $("startHint").textContent = "Output: " + outputDir.name;
+  } catch (x) {
+    if (x.name !== "AbortError") console.error(x);
+  }
+};
+
+$("saveBtn").onclick = async e => {
+  stopEvent(e);
+  if (!trajectory.length) return;
+  try {
+    let fn = "trajectory.csv";
+    while (true) {
+      let inp = prompt("Lütfen kaydedilecek CSV dosyasının adını girin:", fn);
+      if (!inp) return;
+      if (!inp.toLowerCase().endsWith(".csv")) inp += ".csv";
+      fn = inp;
+
+      if (outputDir) {
+        let ex = false;
+        try {
+          await outputDir.getFileHandle(fn);
+          ex = true;
+        } catch (err) {
+          if (err.name === "NotFoundError") ex = false;
+          else throw err;
+        }
+        if (ex) {
+          alert("Bu dizinde '" + fn + "' adında bir dosya zaten var. Lütfen farklı bir isim girin.");
+          continue;
+        }
+      }
+      break;
+    }
+
+    if (outputDir) {
+      let fh = await outputDir.getFileHandle(fn, { create: true });
+      let w = await fh.createWritable();
+      await w.write(csv());
+      await w.close();
+      $("status").textContent = "Saved " + fn;
+      return;
+    }
+
+    let u = URL.createObjectURL(new Blob([csv()], { type: "text/csv" }));
+    let a = document.createElement("a");
+    a.href = u;
+    a.download = fn;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 1000);
+    $("status").textContent = "CSV downloaded";
+  } catch (x) {
+    console.error(x);
+    alert("CSV kaydedilemedi:\n" + x.message);
+  }
+};
+
+// RENDER SÜRECİ
+let csvText = null, renderRoot = null, images = null, renderedCsvName = null;
+
+$("csvBtn").onclick = async e => {
+  stopEvent(e);
+  if (typeof showOpenFilePicker !== "function") { alert("Chrome/Edge kullanın."); return; }
+  try {
+    let h = await showOpenFilePicker({
+      multiple: false,
+      types: [{ description: "CSV", accept: { "text/csv": [".csv"] } }]
+    });
+    if (!h.length) return;
+    let f = await h[0].getFile();
+    csvText = await f.text();
+    $("csvBtn").textContent = "📄 " + f.name;
+    $("csvInfo").textContent = f.name;
+    updateRender();
+  } catch (x) {
+    if (x.name !== "AbortError") console.error(x);
+  }
+};
+
+$("renderFolderBtn").onclick = async e => {
+  stopEvent(e);
+  if (!fs) { alert("Chrome/Edge kullanın."); return; }
+  try {
+    renderRoot = await showDirectoryPicker({ mode: "readwrite" });
+    let fn = "images";
+    while (true) {
+      let inp = prompt("Resimlerin kaydedileceği alt klasör adını girin:", fn);
+      if (!inp) return;
+      fn = inp;
+      let ex = false;
+      try {
+        await renderRoot.getDirectoryHandle(fn);
+        ex = true;
+      } catch (err) {
+        if (err.name === "NotFoundError") ex = false;
+        else throw err;
+      }
+      if (ex) {
+        if (confirm("Bu dizinde '" + fn + "' adında bir klasör zaten var. Önceki dosyaların üzerine yazılabilir.\n\nFarklı bir isim girmek ister misiniz? (İptal: Mevcut klasörü kullan)")) continue;
+      }
+      break;
+    }
+    images = await renderRoot.getDirectoryHandle(fn, { create: true });
+
+    let csvFn = "rendered_frames.csv";
+    while (true) {
+      let inp = prompt("Render edilen framelerin telemetri CSV dosyasının adını girin:", csvFn);
+      if (!inp) return;
+      if (!inp.toLowerCase().endsWith(".csv")) inp += ".csv";
+      csvFn = inp;
+
+      let ex = false;
+      try {
+        await renderRoot.getFileHandle(csvFn);
+        ex = true;
+      } catch (err) {
+        if (err.name === "NotFoundError") ex = false;
+        else throw err;
+      }
+
+      if (ex) {
+        if (confirm("Bu dizinde '" + csvFn + "' adında bir dosya zaten var. Üzerine yazılacaktır.\n\nFarklı bir isim girmek ister misiniz? (İptal: Mevcut dosyanın üzerine yaz)")) continue;
+      }
+      break;
+    }
+    renderedCsvName = csvFn;
+
+    $("renderFolderBtn").textContent = "📁 " + renderRoot.name;
+    $("renderFolderInfo").textContent = renderRoot.name + " / " + fn + " · " + renderedCsvName;
+    updateRender();
+  } catch (x) {
+    if (x.name !== "AbortError") console.error(x);
+  }
+};
+
+function updateRender() {
+  $("renderBtn").disabled = !(csvText && images && renderedCsvName);
+}
+
+function setRenderSelectorsEnabled(enabled) {
+  $("csvBtn").disabled = !enabled;
+  $("renderFolderBtn").disabled = !enabled;
+  $("renderModeSelect").disabled = !enabled;
+  $("keyframeSettingsBtn").disabled = !enabled;
+  $("tileWaitMs").disabled = !enabled;
+}
+
+function parse(text) {
+  let ls = text.replace(/^\uFEFF/, "").trim().split(/\r?\n/);
+  if (ls.length < 2) throw Error("CSV boş veya geçersiz.");
+  let h = ls[0].split(",").map(x => x.trim());
+  let req = ["latitude", "longitude", "altitude", "fov", "pitch", "roll", "yaw"];
+  for (const k of req) {
+    if (!h.includes(k)) throw Error("Eksik kolon: " + k);
+  }
+  let out = [];
+  for (let i = 1; i < ls.length; i++) {
+    if (!ls[i].trim()) continue;
+    let v = ls[i].split(","), r = {};
+    h.forEach((k, j) => r[k] = (v[j] ?? "").trim());
+    ["frame_number", "timestamp_sec", "latitude", "longitude", "altitude", "fov", "pitch", "roll", "yaw"].forEach(k => { if (r[k] !== undefined) r[k] = Number(r[k]); });
+    if (req.every(k => Number.isFinite(r[k]))) out.push(r);
+  }
+  return out;
+}
+
+function angleDiff(a, b) {
+  let d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+function getDistance(lat1, lon1, alt1, lat2, lon2, alt2) {
+  const p1 = Cesium.Cartesian3.fromDegrees(lon1, lat1, alt1);
+  const p2 = Cesium.Cartesian3.fromDegrees(lon2, lat2, alt2);
+  return Cesium.Cartesian3.distance(p1, p2);
+}
+
+function selectKeyframes(rows, config = KEYFRAME_CONFIG) {
+  if (!rows.length) return [];
+  const selected = [rows[0]];
+  let last = rows[0];
+
+  for (let i = 1; i < rows.length; i++) {
+    const cur = rows[i];
+    const dt = Number.isFinite(cur.timestamp_sec) && Number.isFinite(last.timestamp_sec)
+      ? cur.timestamp_sec - last.timestamp_sec
+      : Infinity;
+
+    if (dt < config.minIntervalSec) continue;
+
+    const dist = getDistance(last.latitude, last.longitude, last.altitude, cur.latitude, cur.longitude, cur.altitude);
+    const meaningful =
+      dist >= config.positionMeters ||
+      angleDiff(last.yaw, cur.yaw) >= config.yawDegrees ||
+      angleDiff(last.pitch, cur.pitch) >= config.pitchDegrees ||
+      angleDiff(last.roll, cur.roll) >= config.rollDegrees ||
+      Math.abs(last.fov - cur.fov) >= config.fovDegrees;
+
+    if (meaningful) {
+      selected.push(cur);
+      last = cur;
+    }
+  }
+  return selected;
+}
+
+let rendering = false;
+
+
+// ============================================================
+// STAGE PROFILER
+// ============================================================
+function createProfilerSession(modeName) {
+  return {
+    modeName,
+    startedAt: performance.now(),
+    frames: []
+  };
+}
+
+function createFrameProfile(index, telemetryFrameNumber, modeName) {
+  return {
+    index,
+    telemetryFrameNumber,
+    modeName,
+    startedAt: performance.now(),
+    cameraMs: 0,
+    rafMs: 0,
+    settleMs: 0,
+    tileWaitMs: 0,
+    toBlobMs: 0,
+    queueWaitMs: 0,
+    writeMs: 0,
+    finalYieldMs: 0,
+    totalMs: 0,
+    tileReady: null,
+    tileTimeout: false
+  };
+}
+
+function profileAverage(frames, key) {
+  if (!frames.length) return 0;
+  return frames.reduce((sum, f) => sum + (Number(f[key]) || 0), 0) / frames.length;
+}
+
+function finalizeFrameProfile(fp) {
+  fp.totalMs = performance.now() - fp.startedAt;
+  return fp;
+}
+
+function logFrameProfile(fp) {
+  console.log(
+    `[PROFILE][${fp.modeName}] frame=${fp.telemetryFrameNumber} ` +
+    `camera=${fp.cameraMs.toFixed(2)}ms ` +
+    `rAF=${fp.rafMs.toFixed(2)}ms ` +
+    `settle=${fp.settleMs.toFixed(2)}ms ` +
+    `tileWait=${fp.tileWaitMs.toFixed(2)}ms ` +
+    `toBlob=${fp.toBlobMs.toFixed(2)}ms ` +
+    `queueWait=${fp.queueWaitMs.toFixed(2)}ms ` +
+    `write=${fp.writeMs.toFixed(2)}ms ` +
+    `finalYield=${fp.finalYieldMs.toFixed(2)}ms ` +
+    `total=${fp.totalMs.toFixed(2)}ms ` +
+    `tileReady=${fp.tileReady}`
+  );
+}
+
+function buildProfilerSummary(session) {
+  const frames = session.frames;
+  const n = frames.length;
+  const tileReadyCount = frames.filter(f => f.tileReady === true).length;
+  const tileTimeoutCount = frames.filter(f => f.tileTimeout === true).length;
+
+  return {
+    frameCount: n,
+    avgTotal: profileAverage(frames, "totalMs"),
+    avgCamera: profileAverage(frames, "cameraMs"),
+    avgRaf: profileAverage(frames, "rafMs"),
+    avgSettle: profileAverage(frames, "settleMs"),
+    avgTileWait: profileAverage(frames, "tileWaitMs"),
+    avgToBlob: profileAverage(frames, "toBlobMs"),
+    avgQueueWait: profileAverage(frames, "queueWaitMs"),
+    avgWrite: profileAverage(frames, "writeMs"),
+    avgFinalYield: profileAverage(frames, "finalYieldMs"),
+    tileReadyCount,
+    tileTimeoutCount
+  };
+}
+
+function logProfilerSummary(session) {
+  const s = buildProfilerSummary(session);
+  console.log(
+    `[PROFILE SUMMARY][${session.modeName}] ` +
+    `frames=${s.frameCount} | ` +
+    `avgTotal=${s.avgTotal.toFixed(2)}ms | ` +
+    `camera=${s.avgCamera.toFixed(2)}ms | ` +
+    `rAF=${s.avgRaf.toFixed(2)}ms | ` +
+    `settle=${s.avgSettle.toFixed(2)}ms | ` +
+    `tileWait=${s.avgTileWait.toFixed(2)}ms | ` +
+    `toBlob=${s.avgToBlob.toFixed(2)}ms | ` +
+    `queueWait=${s.avgQueueWait.toFixed(2)}ms | ` +
+    `write=${s.avgWrite.toFixed(2)}ms | ` +
+    `finalYield=${s.avgFinalYield.toFixed(2)}ms | ` +
+    `tileReady=${s.tileReadyCount} | ` +
+    `tileTimeout=${s.tileTimeoutCount}`
+  );
+  return s;
+}
+
+function profilerSummaryText(session) {
+  const s = buildProfilerSummary(session);
+  return (
+    `Mode: ${session.modeName}\n` +
+    `Frames: ${s.frameCount}\n` +
+    `Average total: ${s.avgTotal.toFixed(2)} ms\n` +
+    `Camera: ${s.avgCamera.toFixed(2)} ms\n` +
+    `rAF: ${s.avgRaf.toFixed(2)} ms\n` +
+    `Settle: ${s.avgSettle.toFixed(2)} ms\n` +
+    `Tile wait: ${s.avgTileWait.toFixed(2)} ms\n` +
+    `toBlob/JPEG: ${s.avgToBlob.toFixed(2)} ms\n` +
+    `Queue wait: ${s.avgQueueWait.toFixed(2)} ms\n` +
+    `Write + close: ${s.avgWrite.toFixed(2)} ms\n` +
+    `Final yield: ${s.avgFinalYield.toFixed(2)} ms\n` +
+    `3D tile ready: ${s.tileReadyCount}\n` +
+    `3D timeouts: ${s.tileTimeoutCount}`
+  );
+}
+
+
+// ============================================================
+// RENDER POLICIES
+// ============================================================
+const FAST_REPLAY_CONFIG = {
+  targetFps: 15,
+  jpegQuality: 0.85,
+  maxConcurrentWrites: 3,
+  warmupFrames: 10,
+  warmupSettleMs: 30
+};
+
+const STANDARD_CONFIG = {
+  settleMs: 30,
+  afterFrameYieldMs: 10,
+  jpegQuality: 0.90
+};
+
+const QUALITY_3D_CONFIG = {
+  minWaitMs: 300,
+  maxWaitMs: 3000,
+  defaultWaitMs: 1000,
+  jpegQuality: 0.90,
+  initialSettleMs: 30
+};
+
+function nextAnimationFrame() {
+  return new Promise(resolve => requestAnimationFrame(resolve));
+}
+
+async function twoAnimationFrames() {
+  await new Promise(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))
+  );
+}
+
+function canvasToBlob(quality) {
+  return new Promise((resolve, reject) => {
+    viewer.scene.canvas.toBlob(
+      blob => blob ? resolve(blob) : reject(Error("Canvas blob oluşturulamadı")),
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+async function writeFrameBlob(blob, frameNumber) {
+  const filename = "frame_" + String(frameNumber).padStart(6, "0") + ".jpg";
+  const fh = await images.getFileHandle(filename, { create: true });
+  const w = await fh.createWritable();
+  try {
+    await w.write(blob);
+    await w.close();
+  } catch (err) {
+    try { await w.abort(); } catch (_) {}
+    throw err;
+  }
+}
+
+async function writeRenderedFramesCsv(selectedRows) {
+  const csvContent =
+    "frame_number,latitude,longitude,altitude,fov,pitch,roll,yaw\n" +
+    selectedRows.map(r => [
+      Number.isFinite(r.frame_number) ? r.frame_number : 0,
+      r.latitude,
+      r.longitude,
+      r.altitude,
+      r.fov,
+      r.pitch,
+      r.roll,
+      r.yaw
+    ].join(",")).join("\n") + "\n";
+
+  const fh = await renderRoot.getFileHandle(renderedCsvName, { create: true });
+  const w = await fh.createWritable();
+  try {
+    await w.write(csvContent);
+    await w.close();
+  } catch (err) {
+    try { await w.abort(); } catch (_) {}
+    throw err;
+  }
+}
+
+
+function applyCameraProfiled(r, fp) {
+  const t0 = performance.now();
+  camera(r);
+  fp.cameraMs += performance.now() - t0;
+}
+
+async function oneRafProfiled(fp) {
+  const t0 = performance.now();
+  await nextAnimationFrame();
+  fp.rafMs += performance.now() - t0;
+}
+
+async function twoRafProfiled(fp) {
+  const t0 = performance.now();
+  await twoAnimationFrames();
+  fp.rafMs += performance.now() - t0;
+}
+
+async function waitProfiled(ms, fp, key) {
+  const t0 = performance.now();
+  await wait(ms);
+  fp[key] += performance.now() - t0;
+}
+
+async function blobProfiled(quality, fp) {
+  const t0 = performance.now();
+  const blob = await canvasToBlob(quality);
+  fp.toBlobMs += performance.now() - t0;
+  return blob;
+}
+
+async function writeProfiled(blob, frameNumber, fp) {
+  const t0 = performance.now();
+  await writeFrameBlob(blob, frameNumber);
+  fp.writeMs += performance.now() - t0;
+}
+
+function getRenderPolicy() {
+  return $("renderModeSelect").value;
+}
+
+function get3DWaitMs() {
+  const value = Number($("tileWaitMs").value);
+  if (!Number.isFinite(value) ||
+      value < QUALITY_3D_CONFIG.minWaitMs ||
+      value > QUALITY_3D_CONFIG.maxWaitMs) {
+    throw Error("3D Tile Maximum Wait 300 ile 3000 ms arasında olmalıdır.");
+  }
+  return value;
+}
+
+function updateRenderPolicyUI() {
+  const mode = getRenderPolicy();
+  $("tileWaitWrap").classList.toggle("hidden", mode !== "quality3d");
+
+  if (mode === "fast") {
+    $("renderModeInfo").textContent =
+      "Fast Replay: 15 FPS üst sınırı, yalnızca ilk 10 keyframe için +30 ms warm-up.";
+  } else if (mode === "standard") {
+    $("renderModeInfo").textContent =
+      "Standard: her keyframe için 2 ekran yenilemesi + sabit 30 ms settle ve frame sonunda 10 ms yield.";
+  } else {
+    $("renderModeInfo").textContent =
+      "3D Quality: görünür 3D tile'lar hazır olana kadar bekler; maksimum süre dolarsa mevcut görüntüyü capture edip devam eder.";
+  }
+}
+
+$("renderModeSelect").addEventListener("change", updateRenderPolicyUI);
+updateRenderPolicyUI();
+
+$("keyframeSettingsBtn").addEventListener("click", e => {
+  stopEvent(e);
+  const panel = $("keyframeSettingsPanel");
+  const hidden = panel.classList.toggle("hidden");
+  $("keyframeSettingsBtn").textContent =
+    hidden ? "⚙ Advanced Keyframe Settings" : "⚙ Hide Keyframe Settings";
+});
+
+function getKeyframeConfigFromUI() {
+  const cfg = {
+    positionMeters: Number($("kfPosition").value),
+    yawDegrees: Number($("kfYaw").value),
+    pitchDegrees: Number($("kfPitch").value),
+    rollDegrees: Number($("kfRoll").value),
+    fovDegrees: Number($("kfFov").value),
+    minIntervalSec: Number($("kfMinInterval").value)
+  };
+
+  const checks = [
+    ["Position threshold", cfg.positionMeters, 0.1, 10000],
+    ["Yaw threshold", cfg.yawDegrees, 0.1, 180],
+    ["Pitch threshold", cfg.pitchDegrees, 0.1, 180],
+    ["Roll threshold", cfg.rollDegrees, 0.1, 180],
+    ["FOV threshold", cfg.fovDegrees, 0.1, 180],
+    ["Minimum interval", cfg.minIntervalSec, 0, 60]
+  ];
+
+  for (const [name, value, min, max] of checks) {
+    if (!Number.isFinite(value) || value < min || value > max) {
+      throw Error(name + " " + min + " ile " + max + " arasında olmalıdır.");
+    }
+  }
+  return cfg;
+}
+
+async function captureFast(r, selectedIndex, fp) {
+  applyCameraProfiled(r, fp);
+  viewer.scene.requestRender();
+
+  await oneRafProfiled(fp);
+
+  if (selectedIndex < FAST_REPLAY_CONFIG.warmupFrames) {
+    await waitProfiled(
+      FAST_REPLAY_CONFIG.warmupSettleMs,
+      fp,
+      "settleMs"
+    );
+  }
+
+  const blob = await blobProfiled(FAST_REPLAY_CONFIG.jpegQuality, fp);
+  const n = Number.isFinite(r.frame_number) ? r.frame_number : 0;
+  return { blob, frameNumber: n };
+}
+
+async function renderStandardFrame(r, fp) {
+  applyCameraProfiled(r, fp);
+  viewer.scene.requestRender();
+
+  await twoRafProfiled(fp);
+  await waitProfiled(STANDARD_CONFIG.settleMs, fp, "settleMs");
+
+  const blob = await blobProfiled(STANDARD_CONFIG.jpegQuality, fp);
+  const n = Number.isFinite(r.frame_number) ? r.frame_number : 0;
+  await writeProfiled(blob, n, fp);
+}
+
+async function waitFor3DTiles(maxWaitMs, fp) {
+  const start = performance.now();
+
+  // Initial traversal/render stabilization
+  await twoRafProfiled(fp);
+  await waitProfiled(
+    QUALITY_3D_CONFIG.initialSettleMs,
+    fp,
+    "settleMs"
+  );
+
+  const tileWaitStart = performance.now();
+
+  while (true) {
+    if (googleTileset && googleTileset.tilesLoaded === true) {
+      fp.tileWaitMs += performance.now() - tileWaitStart;
+      fp.tileReady = true;
+      fp.tileTimeout = false;
+      return {
+        ready: true,
+        waitedMs: performance.now() - start
+      };
+    }
+
+    const elapsed = performance.now() - start;
+    if (elapsed >= maxWaitMs) {
+      fp.tileWaitMs += performance.now() - tileWaitStart;
+      fp.tileReady = false;
+      fp.tileTimeout = true;
+      return {
+        ready: false,
+        waitedMs: elapsed
+      };
+    }
+
+    viewer.scene.requestRender();
+    await oneRafProfiled(fp);
+  }
+}
+
+async function render3DQualityFrame(r, maxWaitMs, fp) {
+  applyCameraProfiled(r, fp);
+  viewer.scene.requestRender();
+
+  const tileResult = await waitFor3DTiles(maxWaitMs, fp);
+
+  viewer.scene.requestRender();
+  await oneRafProfiled(fp);
+
+  const blob = await blobProfiled(QUALITY_3D_CONFIG.jpegQuality, fp);
+  const n = Number.isFinite(r.frame_number) ? r.frame_number : 0;
+  await writeProfiled(blob, n, fp);
+
+  return tileResult;
+}
+
+$("renderBtn").onclick = async e => {
+  stopEvent(e);
+  if (rendering) return;
+  if (!csvText || !images) {
+    alert("Önce CSV ve render output klasörünü seçin.");
+    return;
+  }
+
+  let rows;
+  try {
+    rows = parse(csvText);
+  } catch (x) {
+    alert(x.message);
+    return;
+  }
+  if (!rows.length) {
+    alert("CSV içinde geçerli frame yok.");
+    return;
+  }
+
+  const policy = getRenderPolicy();
+
+  let activeKeyframeConfig;
+  try {
+    activeKeyframeConfig = getKeyframeConfigFromUI();
+  } catch (x) {
+    alert(x.message);
+    return;
+  }
+
+  let quality3DWaitMs = QUALITY_3D_CONFIG.defaultWaitMs;
+
+  if (policy === "quality3d") {
+    try {
+      quality3DWaitMs = get3DWaitMs();
+    } catch (x) {
+      alert(x.message);
+      return;
+    }
+  }
+
+  rendering = true;
+  appMode = "render";
+  if (document.pointerLockElement) {
+    try { document.exitPointerLock(); } catch (_) {}
+  }
+  locked = false;
+  Object.keys(keys).forEach(k => keys[k] = false);
+  viewer.scene.screenSpaceCameraController.enableInputs = false;
+  $("cesiumContainer").style.pointerEvents = "none";
+
+  const selectedRows = selectKeyframes(rows, activeKeyframeConfig);
+  const skipped = rows.length - selectedRows.length;
+
+  // Render performans ölçümü
+  const renderStartTime = performance.now();
+
+  $("renderBtn").disabled = true;
+  setRenderSelectorsEnabled(false);
+  $("progressText").textContent = "0 / " + selectedRows.length;
+  $("progressBar").style.width = "0%";
+
+  let modeLabel = "";
+  if (policy === "fast") {
+    modeLabel = "Fast Replay";
+    $("renderBtn").textContent = "Fast Replay...";
+    $("status").textContent = "Fast Replay Capture...";
+  } else if (policy === "standard") {
+    modeLabel = "Standard 30 ms";
+    $("renderBtn").textContent = "Standard Render...";
+    $("status").textContent = "Standard Rendering...";
+  } else {
+    modeLabel = "3D Quality";
+    $("renderBtn").textContent = "3D Quality...";
+    $("status").textContent = "3D Quality Rendering...";
+  }
+
+  const profilerEnabled = $("enableProfiler")?.checked !== false;
+  const profilerSession = profilerEnabled
+    ? createProfilerSession(modeLabel)
+    : null;
+
+  if (profilerSession) {
+    $("profilerInfo").textContent = "Profiler running...";
+  }
+
+  try {
+    let written = 0;
+    let tileTimeouts = 0;
+
+    if (policy === "fast") {
+      const frameIntervalMs = 1000 / FAST_REPLAY_CONFIG.targetFps;
+      const pendingWrites = new Set();
+
+      for (let i = 0; i < selectedRows.length; i++) {
+        const cycleStart = performance.now();
+        const frameTimingStart = cycleStart;
+        const fp = profilerSession
+          ? createFrameProfile(i, selectedRows[i].frame_number, modeLabel)
+          : createFrameProfile(i, selectedRows[i].frame_number, modeLabel);
+
+        const captured = await captureFast(selectedRows[i], i, fp);
+
+        const writePromise = writeFrameBlob(captured.blob, captured.frameNumber)
+          .then(() => { written++; })
+          .catch(err => {
+            console.error("[FAST-REPLAY WRITE ERROR] frame=" + captured.frameNumber, err);
+            throw err;
+          })
+          .finally(() => pendingWrites.delete(writePromise));
+
+        pendingWrites.add(writePromise);
+
+        if (pendingWrites.size >= FAST_REPLAY_CONFIG.maxConcurrentWrites) {
+          const queueStart = performance.now();
+          await Promise.race(pendingWrites);
+          fp.queueWaitMs += performance.now() - queueStart;
+        }
+
+        const p = (i + 1) / selectedRows.length * 100;
+        $("progressBar").style.width = p + "%";
+        $("progressText").textContent =
+          (i + 1) + " / " + selectedRows.length +
+          " · Fast Replay " + FAST_REPLAY_CONFIG.targetFps + " FPS" +
+          (i < FAST_REPLAY_CONFIG.warmupFrames ? " · warmup +30ms" : "");
+
+        const elapsed = performance.now() - cycleStart;
+        const remaining = frameIntervalMs - elapsed;
+        if (remaining > 0) await wait(remaining);
+
+        finalizeFrameProfile(fp);
+        if (profilerSession) {
+          profilerSession.frames.push(fp);
+          logFrameProfile(fp);
+        }
+      }
+
+      await Promise.all(pendingWrites);
+
+    } else if (policy === "standard") {
+      for (let i = 0; i < selectedRows.length; i++) {
+        const fp = createFrameProfile(i, selectedRows[i].frame_number, modeLabel);
+        await renderStandardFrame(selectedRows[i], fp);
+        written++;
+
+        const p = (i + 1) / selectedRows.length * 100;
+        $("progressBar").style.width = p + "%";
+        $("progressText").textContent =
+          (i + 1) + " / " + selectedRows.length + " · Standard · +30ms";
+
+        await waitProfiled(STANDARD_CONFIG.afterFrameYieldMs, fp, "finalYieldMs");
+
+        finalizeFrameProfile(fp);
+        if (profilerSession) {
+          profilerSession.frames.push(fp);
+          logFrameProfile(fp);
+        }
+      }
+
+    } else {
+      for (let i = 0; i < selectedRows.length; i++) {
+        const fp = createFrameProfile(i, selectedRows[i].frame_number, modeLabel);
+        const tileResult = await render3DQualityFrame(selectedRows[i], quality3DWaitMs, fp);
+        written++;
+        if (!tileResult.ready) tileTimeouts++;
+
+        const p = (i + 1) / selectedRows.length * 100;
+        $("progressBar").style.width = p + "%";
+        $("progressText").textContent =
+          (i + 1) + " / " + selectedRows.length +
+          " · 3D Quality · " +
+          (tileResult.ready
+            ? "tiles ready " + Math.round(tileResult.waitedMs) + "ms"
+            : "timeout " + quality3DWaitMs + "ms");
+
+        finalizeFrameProfile(fp);
+        if (profilerSession) {
+          profilerSession.frames.push(fp);
+          logFrameProfile(fp);
+        }
+      }
+    }
+
+    const renderTotalMs = performance.now() - renderStartTime;
+    const averageMsPerKeyframe = selectedRows.length
+      ? renderTotalMs / selectedRows.length
+      : 0;
+
+    console.log(
+      `[TIMING][${modeLabel}] Render complete | ` +
+      `total=${renderTotalMs.toFixed(2)} ms | ` +
+      `average=${averageMsPerKeyframe.toFixed(2)} ms/keyframe | ` +
+      `keyframes=${selectedRows.length}`
+    );
+
+    await writeRenderedFramesCsv(selectedRows);
+
+    let profilerSummary = null;
+    if (profilerSession) {
+      profilerSummary = logProfilerSummary(profilerSession);
+      $("profilerInfo").textContent = profilerSummaryText(profilerSession);
+    }
+
+    $("status").textContent = "Render complete";
+
+    let summary =
+      "Render tamamlandı.\n\n" +
+      "Original frames: " + rows.length + "\n" +
+      "Selected keyframes: " + selectedRows.length + "\n" +
+      "Written images: " + written + "\n" +
+      "Skipped by keyframe selection: " + skipped + "\n" +
+      "Mode: " + modeLabel +
+      "\nKeyframes: position " + activeKeyframeConfig.positionMeters + " m" +
+      ", yaw " + activeKeyframeConfig.yawDegrees + "°" +
+      ", pitch " + activeKeyframeConfig.pitchDegrees + "°" +
+      ", roll " + activeKeyframeConfig.rollDegrees + "°" +
+      ", FOV " + activeKeyframeConfig.fovDegrees + "°" +
+      ", min interval " + activeKeyframeConfig.minIntervalSec + " s";
+
+    if (policy === "fast") {
+      summary += "\nFPS limit: " + FAST_REPLAY_CONFIG.targetFps;
+    } else if (policy === "standard") {
+      summary += "\nSettle: " + STANDARD_CONFIG.settleMs + " ms";
+    } else {
+      summary +=
+        "\n3D max wait: " + quality3DWaitMs + " ms" +
+        "\n3D wait timeouts: " + tileTimeouts;
+    }
+
+    summary +=
+      "\nTotal render time: " + renderTotalMs.toFixed(2) + " ms" +
+      "\nAverage per keyframe: " + averageMsPerKeyframe.toFixed(2) + " ms";
+
+    if (profilerSummary) {
+      summary +=
+        "\n\n--- Stage Profiler ---" +
+        "\nAverage total: " + profilerSummary.avgTotal.toFixed(2) + " ms" +
+        "\nCamera: " + profilerSummary.avgCamera.toFixed(2) + " ms" +
+        "\nrAF: " + profilerSummary.avgRaf.toFixed(2) + " ms" +
+        "\nSettle: " + profilerSummary.avgSettle.toFixed(2) + " ms" +
+        "\nTile wait: " + profilerSummary.avgTileWait.toFixed(2) + " ms" +
+        "\ntoBlob/JPEG: " + profilerSummary.avgToBlob.toFixed(2) + " ms" +
+        "\nQueue wait: " + profilerSummary.avgQueueWait.toFixed(2) + " ms" +
+        "\nWrite + close: " + profilerSummary.avgWrite.toFixed(2) + " ms" +
+        "\nFinal yield: " + profilerSummary.avgFinalYield.toFixed(2) + " ms";
+    }
+
+    summary +=
+      "\n\nOutput: " + renderRoot.name + "/" + images.name +
+      "\nTelemetry CSV: " + renderRoot.name + "/" + renderedCsvName;
+    alert(summary);
+
+  } catch (x) {
+    console.error(x);
+    $("status").textContent = "Render error";
+    alert("Render sırasında hata oluştu:\n\n" + x.message);
+  } finally {
+    rendering = false;
+    $("renderBtn").textContent = "▶ START RENDER";
+    setRenderSelectorsEnabled(true);
+    updateRender();
+  }
+};
+
+// MOD DEĞİŞTİRME
+$("flightModeBtn").onclick = e => {
+  stopEvent(e);
+  if (rendering) return;
+  appMode = "flight";
+  viewer.scene.screenSpaceCameraController.enableInputs = true;
+  $("cesiumContainer").style.pointerEvents = "auto";
+  $("flightModeBtn").classList.add("active");
+  $("renderModeBtn").classList.remove("active");
+  $("flightPanel").classList.remove("hidden");
+  $("renderPanel").classList.add("hidden");
+};
+
+$("renderModeBtn").onclick = e => {
+  stopEvent(e);
+  if (rendering) return;
+  appMode = "render";
+  setRenderSelectorsEnabled(true);
+  if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (_) {} }
+  locked = false;
+  Object.keys(keys).forEach(k => keys[k] = false);
+  viewer.scene.screenSpaceCameraController.enableInputs = false;
+  $("cesiumContainer").style.pointerEvents = "none";
+  $("renderModeBtn").classList.add("active");
+  $("flightModeBtn").classList.remove("active");
+  $("flightPanel").classList.add("hidden");
+  $("renderPanel").classList.remove("hidden");
+};
+
+// UI GÜNCELLEME VE ANA SİMÜLASYON DÖNGÜSÜ
+function ui() {
+  for (const [id, v] of [
+    ["lat", state.latitude.toFixed(6)],
+    ["lon", state.longitude.toFixed(6)],
+    ["alt", state.altitude.toFixed(1)],
+    ["fov", state.fov.toFixed(1)],
+    ["pitch", state.pitch.toFixed(2)],
+    ["roll", state.roll.toFixed(2)],
+    ["yaw", state.yaw.toFixed(2)],
+    ["maxSpeed", state.maxSpeed.toFixed(1)]
+  ]) $(id).textContent = v;
+}
+
+let last = performance.now();
+function loop(t) {
+  let dt = Math.min((t - last) / 1000, 0.1);
+  last = t;
+  if (started && !rendering && appMode === "flight") {
+    fly(dt);
+    camera();
+    recordLoop(t);
+    ui();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
